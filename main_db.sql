@@ -1,11 +1,14 @@
 use [master];
 
+
 IF EXISTS(SELECT name FROM sys.databases WHERE (name = 'CTF'))
      DROP DATABASE [CTF];
 
 CREATE DATABASE [CTF];
 
 use [CTF];
+
+
 
 create table UserList(
 	user_id varchar(50) PRIMARY KEY NOT NULL,
@@ -44,6 +47,41 @@ CREATE TABLE HintUseList(
 	use_time DATETIME not null,
 );
 
+Go
+CREATE PROCEDURE proc_solv(
+	@P_prob_id INT,
+	@P_user_name varchar(50),
+	@P_solve_time DATETIME
+)
+WITH ENCRYPTION
+AS
+	INSERT INTO SolveList VALUES(@P_prob_id, @P_user_name, @P_solve_time);
+	UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = @P_prob_id) WHERE user_id = @P_user_name;
+GO
+
+CREATE PROCEDURE proc_hint(
+	@P_hint_id INT,
+	@P_user_name varchar(50),
+	@P_hint_time DATETIME
+)
+
+AS
+	INSERT INTO HintUseList VALUES (@P_hint_id, @P_user_name, @P_hint_time);
+	UPDATE UserList SET user_point -= (SELECT hint_cost FROM HintList WHERE hint_id = @P_hint_id) WHERE user_id = @P_user_name;
+
+GO
+
+CREATE TRIGGER congraturation
+	ON SolveList
+	AFTER INSERT
+	AS
+	BEGIN
+		select '문제를 풀었습니다.';
+END;
+GO
+
+CREATE NONCLUSTERED INDEX ix_Hint ON HintList (prob_id);
+
 INSERT INTO UserList VALUES('C0L4', '3A70163A7D6D00626DFD83E8FF893CF0', '0816i@naver.com', 0, 'M');
 INSERT INTO UserList VALUES('fishsoup', '3A70163A7D6D00626DFD83E8FF893CF0', 'admin@fishsoup.kr', 0, 'J');
 INSERT INTO UserList VALUES('starbox', '3A70163A7D6D00626DFD83E8FF893CF0', 'starbox@gamil.com', 0, 'J');
@@ -58,17 +96,14 @@ INSERT INTO HintList VALUES(2, '엄청난 해킹지식이 담겨있는 내용입
 INSERT INTO HintList VALUES(3, '잘못 만들어진 문제의 잘못된 힌트입니다! 도움은.. 되지 않습니다!', 90);
 INSERT INTO HintList VALUES(3, '잘못 만들어진 문제의 또다른 잘못된 힌트입니다! 도움은.. 되지 않습니다!', 90);
 
-INSERT INTO SolveList VALUES(1, 'fishsoup', '2020-06-25 14:09:45');
-UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = 1) WHERE user_id = 'fishsoup';
-INSERT INTO SolveList VALUES(1, 'starbox', '2020-06-25 14:10:45');
-UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = 1) WHERE user_id = 'starbox';
+EXEC proc_solv 1, 'fishsoup', '2020-06-25 14:09:45';
+EXEC proc_solv 1, 'starbox', '2020-06-25 14:10:45';
 INSERT INTO SolveList VALUES(1, 'kdw', '2020-06-25 14:10:48.245');
 UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = 1) WHERE user_id = 'kdw';
 INSERT INTO SolveList VALUES(1, 'No_Named', '2020-06-25 14:19:48');
 UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = 1) WHERE user_id = 'No_Named';
 
-INSERT INTO HintUseList VALUES (1, 'No_Named', '2020-06-25 14:20:25');
-UPDATE UserList SET user_point -= (SELECT hint_cost FROM HintList WHERE hint_id = 1) WHERE user_id = 'No_Named';
+EXEC proc_hint 1, "No_Named", '2020-06-25 14:20:25';
 
 INSERT INTO SolveList VALUES(2, 'No_Named', '2020-06-25 14:30:59');
 UPDATE UserList SET user_point += (SELECT prob_point FROM ProblemList WHERE prob_id = 2) WHERE user_id = 'No_Named';
@@ -89,3 +124,12 @@ select * from UserList order by user_point desc;
 select * from ProblemList;
 select * from SolveList;
 select * from HintUseList;
+
+go
+create view vw_email_solve (user_email, prob_id, solve_time)
+as select us.user_email, prob.prob_id, prob.solve_time
+from UserList us, SolveList prob
+where us.user_id = prob.user_id;
+
+go
+select * from vw_email_solve;
